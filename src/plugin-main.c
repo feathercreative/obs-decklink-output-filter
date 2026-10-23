@@ -77,8 +77,10 @@ static void decklink_output_filter_start(struct decklink_output_filter_context *
 		return;
 	}
 
+	const char *parent_name = obs_source_get_name(filter->parent);
+
 	struct dstr name = {0};
-	dstr_printf(&name, "decklink_filter_output (%s)", obs_source_get_name(filter->parent));
+	dstr_printf(&name, "decklink_filter_output (%s)", parent_name);
 	filter->output = obs_output_create("decklink_output", name.array, settings, NULL);
 	dstr_free(&name);
 	if (!filter->output) {
@@ -88,7 +90,12 @@ static void decklink_output_filter_start(struct decklink_output_filter_context *
 
 	struct obs_video_info ovi;
 	obs_get_video_info(&ovi);
-	filter->canvas = obs_canvas_create_private(NULL, &ovi, DEVICE);
+	/* The canvas needs a name: obs-websocket (OBS 32) reads it when the canvas is destroyed
+	 * and crashed on the unnamed one (2026-10-23). */
+	struct dstr canvas_name = {0};
+	dstr_printf(&canvas_name, "DeckLink filter (%s)", parent_name);
+	filter->canvas = obs_canvas_create_private(canvas_name.array, &ovi, DEVICE);
+	dstr_free(&canvas_name);
 	if (!filter->canvas) {
 		obs_log(LOG_ERROR, "Could not create a canvas");
 		obs_output_release(filter->output);
